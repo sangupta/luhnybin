@@ -6,13 +6,18 @@ import java.io.Reader;
 
 public class Luhn {
 	
-	Reader reader;
+	private Reader reader;
 
+	private StringBuilder buffer = new StringBuilder();
+	
+	private StringBuilder digits = new StringBuilder();
+	
 	public static void main(String[] args) throws IOException {
 		Luhn luhn = new Luhn();
 		luhn.reader = new InputStreamReader(System.in);
 		
 		luhn.execute();
+		//System.out.println(luhn.filter("7288-8379-3639-2755\n"));
 	}
 
 	public void execute() throws IOException {
@@ -28,9 +33,6 @@ public class Luhn {
 	}
 
 	private String filter(String line) {
-		StringBuilder buffer = new StringBuilder();
-		
-		StringBuilder digits = new StringBuilder();
 		
 		boolean toBeReplaced = false;
 		for(int index = 0; index < line.length(); index++) {
@@ -50,10 +52,28 @@ public class Luhn {
 			} else {
 				digits.append(c);
 			}
+			
+			if(digitsLength(digits) > 16 && !toBeReplaced) {
+				buffer.append(digits.charAt(0));
+				digits.delete(0, 1);
+			}
 
-			if(digits.length() >= 14) {
+			if(digitsLength(digits) >= 14) {
 				if(isLuhn(digits)) {
 					toBeReplaced = true;
+				} else {
+					if(toBeReplaced) {
+						// the last string was a luhn
+						// do the same
+						digits.delete(digits.length() - 1, digits.length());
+						replaceDigits(digits);
+						
+						buffer.append(digits.toString());
+						digits.setLength(0);
+						digits.append(c);
+						
+						toBeReplaced = false;
+					}
 				}
 			}
 		}
@@ -70,12 +90,22 @@ public class Luhn {
 		return buffer.toString();
 	}
 
+	private int digitsLength(StringBuilder digits) {
+		int len = 0;
+		for(int index = 0; index < digits.length(); index++) {
+			if(isDigit(digits.charAt(index))) {
+				len++;
+			}
+		}
+		return len;
+	}
+
 	private void replaceDigits(StringBuilder digits) {
 		final int len = digits.length();
 		
-		if(len < 14 || len > 16) {
-			return;
-		}
+//		if(len < 14 || len > 16) {
+//			return;
+//		}
 		
 		for(int index = 0; index < len; index++) {
 			char c = digits.charAt(index);
@@ -100,17 +130,18 @@ public class Luhn {
 				}
 				
 				sum += (digit / 10) + (digit % 10);
+				twice = !twice;
+
 			} else {
-				index--;
+				continue;
 			}
 			
-			twice = !twice;
 		}
 		return sum % 10 == 0;
 	}
 
 	private boolean isValid(char c) {
-		return isDigit(c) || c == ' ' || c == '_';
+		return isDigit(c) || c == ' ' || c == '-';
 	}
 	
 	private boolean isDigit(char c) {
