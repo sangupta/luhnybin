@@ -12,6 +12,10 @@ public class Luhn {
 	
 	private StringBuilder digits = new StringBuilder();
 	
+	private int digitsLength = 0;
+	
+	private boolean toBeReplaced = false;
+	
 	public static void main(String[] args) throws IOException {
 		Luhn luhn = new Luhn();
 		luhn.reader = new InputStreamReader(System.in);
@@ -31,35 +35,63 @@ public class Luhn {
 		line = filter(line);
 		System.out.write(line.getBytes());
 	}
+	
+	/**
+	 * Empty digits into buffer
+	 */
+	private void emptyDigits() {
+		buffer.append(digits.toString());
+		digits.setLength(0);
+		digitsLength = 0;
+	}
+	
+	/**
+	 * Check if replacement is necessary, and then empty digits into buffer
+	 * 
+	 */
+	private void replaceAndEmptyIfNeeded() {
+		if(digits.length() > 0) {
+			if(toBeReplaced) {
+				replaceDigits(digits);
+			}
+	
+			emptyDigits();
+		}
+	}
+	
+	private void addDigit(char c) {
+		digits.append(c);
+		if(isDigit(c)) {
+			digitsLength++;
+		}
+	}
 
+	/**
+	 * Filter the given line per LUHN rules
+	 * 
+	 * @param line
+	 * @return
+	 */
 	private String filter(String line) {
 		
-		boolean toBeReplaced = false;
 		for(int index = 0; index < line.length(); index++) {
-			char c = line.charAt(index);
-			if(!isValid(c)) {
-				if(digits.length() > 0) {
-					if(toBeReplaced) {
-						replaceDigits(digits);
-					}
-					
-					buffer.append(digits.toString());
-					digits.setLength(0);
-				}
+			char character = line.charAt(index);
+			if(!isValidCharacter(character)) {
+				replaceAndEmptyIfNeeded();
 				
-				buffer.append(c);
+				buffer.append(character);
 				toBeReplaced = false;
 			} else {
-				digits.append(c);
+				addDigit(character);
 			}
 			
-			if(digitsLength(digits) > 16 && !toBeReplaced) {
+			if(digitsLength > 16 && !toBeReplaced) {
 				buffer.append(digits.charAt(0));
 				digits.delete(0, 1);
 			}
 
-			if(digitsLength(digits) >= 14) {
-				if(isLuhn(digits)) {
+			if(digitsLength >= 14) {
+				if(isLuhn()) {
 					toBeReplaced = true;
 				} else {
 					if(toBeReplaced) {
@@ -68,9 +100,8 @@ public class Luhn {
 						digits.delete(digits.length() - 1, digits.length());
 						replaceDigits(digits);
 						
-						buffer.append(digits.toString());
-						digits.setLength(0);
-						digits.append(c);
+						emptyDigits();
+						addDigit(character);
 						
 						toBeReplaced = false;
 					}
@@ -78,49 +109,39 @@ public class Luhn {
 			}
 		}
 		
-		if(digits.length() > 0) {
-			if(toBeReplaced) {
-				replaceDigits(digits);
-			}
-			
-			buffer.append(digits.toString());
-			digits.setLength(0);
-		}
+		replaceAndEmptyIfNeeded();
 		
 		return buffer.toString();
 	}
 
-	private int digitsLength(StringBuilder digits) {
-		int len = 0;
-		for(int index = 0; index < digits.length(); index++) {
-			if(isDigit(digits.charAt(index))) {
-				len++;
-			}
-		}
-		return len;
-	}
-
+	/**
+	 * Replace the digits in the string with an 'X'
+	 * 
+	 * @param digits
+	 */
 	private void replaceDigits(StringBuilder digits) {
-		final int len = digits.length();
+		final int length = digits.length();
 		
-//		if(len < 14 || len > 16) {
-//			return;
-//		}
-		
-		for(int index = 0; index < len; index++) {
-			char c = digits.charAt(index);
-			if(isDigit(c)) {
+		for(int index = 0; index < length; index++) {
+			char character = digits.charAt(index);
+			if(isDigit(character)) {
 				digits.setCharAt(index, 'X');
 			}
 		}
 	}
 
-	private boolean isLuhn(StringBuilder digits) {
-		final int len = digits.length();
+	/**
+	 * Check if the given digits represent a LUHN number
+	 * 
+	 * @param digits
+	 * @return
+	 */
+	private boolean isLuhn() {
+		final int length = digits.length();
 		
 		int sum = 0;
 		boolean twice = false;
-		for(int index = len - 1; index >=0; index--) {
+		for(int index = length - 1; index >= 0; index--) {
 			char c = digits.charAt(index);
 			if(isDigit(c)) {
 				int digit = c - '0';
@@ -140,10 +161,22 @@ public class Luhn {
 		return sum % 10 == 0;
 	}
 
-	private boolean isValid(char c) {
+	/**
+	 * Check if the character is a valid digit, or space or a dash/hyphen.
+	 * 
+	 * @param c
+	 * @return
+	 */
+	private boolean isValidCharacter(char c) {
 		return isDigit(c) || c == ' ' || c == '-';
 	}
 	
+	/**
+	 * Check if the character is a valid digit or not.
+	 * 
+	 * @param c
+	 * @return
+	 */
 	private boolean isDigit(char c) {
 		return (c >= '0' && c <= '9');
 	}
