@@ -1,174 +1,131 @@
 package com.sangupta.luhnybin;
 
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.Reader;
+import java.io.InputStream;
+import java.io.OutputStream;
 
 public class Luhn {
 	
-	private Reader reader;
+	private static final char HYPHEN = '-';
+
+	private static final char SPACE = ' ';
+
+	private static final char DIGIT_NINE = '9';
+
+	private static final char DIGIT_ZERO = '0';
+
+	private static final int MAX_LENGTH = 16;
+
+	private static final char REPLACEMENT = 'X';
+
+	private static final int MIN_LENGTH = 14;
+
+	private InputStream reader;
+	
+	private OutputStream out;
 
 	private StringBuilder buffer = new StringBuilder();
 	
 	private StringBuilder digits = new StringBuilder();
 	
-	private int digitsLength = 0;
-	
-	private boolean toBeReplaced = false;
-	
+	public Luhn() {
+	}
+
 	public static void main(String[] args) throws IOException {
 		Luhn luhn = new Luhn();
-		luhn.reader = new InputStreamReader(System.in);
+		
+		luhn.reader = System.in;
+		luhn.out = System.out;
 		
 		luhn.execute();
-		//System.out.println(luhn.filter("7288-8379-3639-2755\n"));
 	}
 
 	public void execute() throws IOException {
-		int chr;
-		StringBuffer l = new StringBuffer();
-		while ((chr = reader.read()) != -1) {
-			l.append(Character.valueOf((char) chr));
+		int character;
+		while ((character = reader.read()) != -1) {
+			if(!isValidCharacter(character)) {
+				emptyCurrentBuffer();
+				out.write(character);
+			} else {
+				buffer.append((char) character);
+				
+				if(isDigit(character)) {
+					digits.append((char) character);
+				}
+				
+				if(digits.length() < MIN_LENGTH) {
+					continue;
+				}
+	
+				int luhnLength = getLuhnLength();
+				if(luhnLength > 0) {
+					replaceLastLuhnLengthDigits(luhnLength);
+				}
+			}
 		}
-
-		String line = l.toString();
-		line = filter(line);
-		System.out.write(line.getBytes());
 	}
 	
-	/**
-	 * Empty digits into buffer
-	 */
-	private void emptyDigits() {
-		buffer.append(digits.toString());
+	private void emptyCurrentBuffer() throws IOException {
+		out.write(buffer.toString().getBytes());
+		buffer.setLength(0);
 		digits.setLength(0);
-		digitsLength = 0;
 	}
-	
+
 	/**
 	 * Check if replacement is necessary, and then empty digits into buffer
 	 * 
 	 */
-	private void replaceAndEmptyIfNeeded() {
-		if(digits.length() > 0) {
-			if(toBeReplaced) {
-				replaceDigits(digits);
+	private void replaceLastLuhnLengthDigits(int count) throws IOException {
+		for (int index = buffer.length() - 1; index >= 0; index--) {
+			if(count == 0) {
+				break;
 			}
-	
-			emptyDigits();
+
+			if (isDigit(buffer.charAt(index))) {
+				buffer.setCharAt(index, REPLACEMENT);
+				count--;
+			}
 		}
 	}
 	
-	private void addDigit(char c) {
-		digits.append(c);
-		if(isDigit(c)) {
-			digitsLength++;
-		}
-	}
-
-	/**
-	 * Filter the given line per LUHN rules
-	 * 
-	 * @param line
-	 * @return
-	 */
-	private String filter(String line) {
-		
-		for(int index = 0; index < line.length(); index++) {
-			char character = line.charAt(index);
-			if(!isValidCharacter(character)) {
-				replaceAndEmptyIfNeeded();
-				
-				buffer.append(character);
-				toBeReplaced = false;
-			} else {
-				addDigit(character);
-			}
-			
-			if(digitsLength > 16 && !toBeReplaced) {
-				buffer.append(digits.charAt(0));
-				digits.delete(0, 1);
-			}
-
-			if(digitsLength >= 14) {
-				if(isLuhn()) {
-					toBeReplaced = true;
-				} else {
-					if(toBeReplaced) {
-						// the last string was a luhn
-						// do the same
-						digits.delete(digits.length() - 1, digits.length());
-						replaceDigits(digits);
-						
-						emptyDigits();
-						addDigit(character);
-						
-						toBeReplaced = false;
-					}
-				}
-			}
-		}
-		
-		replaceAndEmptyIfNeeded();
-		
-		return buffer.toString();
-	}
-
-	/**
-	 * Replace the digits in the string with an 'X'
-	 * 
-	 * @param digits
-	 */
-	private void replaceDigits(StringBuilder digits) {
-		final int length = digits.length();
-		
-		for(int index = 0; index < length; index++) {
-			char character = digits.charAt(index);
-			if(isDigit(character)) {
-				digits.setCharAt(index, 'X');
-			}
-		}
-	}
-
 	/**
 	 * Check if the given digits represent a LUHN number
 	 * 
 	 * @param digits
 	 * @return
 	 */
-	private boolean isLuhn() {
-		final int length = digits.length();
+	private int getLuhnLength() {
+		int totalLength = digits.length();
+		final int length = totalLength < MAX_LENGTH ? totalLength : MAX_LENGTH;
 		
-		int sum = 0;
-		boolean twice = false;
-		for(int index = length - 1; index >= 0; index--) {
-			char c = digits.charAt(index);
-			if(isDigit(c)) {
-				int digit = c - '0';
-				
-				if(twice) {
-					digit *= 2;
-				}
-				
-				sum += (digit / 10) + (digit % 10);
-				twice = !twice;
-
-			} else {
-				continue;
+		int sum = 0, luhnLength = 0;
+		for(int index = 1; index <= length; index++) {
+			int digit = digits.charAt(totalLength - index) - DIGIT_ZERO;
+			
+			if(index % 2 == 0) {
+				digit *= 2;
 			}
 			
+			sum += (digit / 10) + (digit % 10);
+			
+			if(index >= MIN_LENGTH) {
+				if(sum % 10 == 0) {
+					luhnLength = index;
+				}
+			}
 		}
-		return sum % 10 == 0;
+		
+		return luhnLength;
 	}
-
+	
 	/**
 	 * Check if the character is a valid digit, or space or a dash/hyphen.
 	 * 
 	 * @param c
 	 * @return
 	 */
-	private boolean isValidCharacter(char c) {
-		return isDigit(c) || c == ' ' || c == '-';
+	private boolean isValidCharacter(int c) {
+		return isDigit(c) || c == SPACE || c == HYPHEN;
 	}
 	
 	/**
@@ -177,8 +134,8 @@ public class Luhn {
 	 * @param c
 	 * @return
 	 */
-	private boolean isDigit(char c) {
-		return (c >= '0' && c <= '9');
+	private boolean isDigit(int c) {
+		return (c >= DIGIT_ZERO && c <= DIGIT_NINE);
 	}
 
 }
